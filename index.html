@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'">
+  <title>Barbershop</title>
+  <meta name="description" content="Track every cut. Cash vs card, tips and daily totals — all on your phone.">
+  <meta name="theme-color" content="#F1F1EF">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Barbershop">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-text">
+      <h1 id="greeting">Welcome back</h1>
+      <p id="dateline"></p>
+    </div>
+    <div class="topbar-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l2.2 6.2L20 10l-5.8 1.8L12 18l-2.2-6.2L4 10l5.8-1.8z" fill="currentColor"/></svg>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="screen-log" class="screen active" data-screen="log"></section>
+    <section id="screen-dash" class="screen" data-screen="dash"></section>
+    <section id="screen-history" class="screen" data-screen="history"></section>
+    <section id="screen-more" class="screen" data-screen="more"></section>
+  </main>
+
+  <nav id="tabbar" aria-label="Main">
+    <button class="tab active" data-a="tab" data-v="log" aria-label="Log">
+      <svg viewBox="0 0 24 24"><circle cx="6.5" cy="6.5" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="6.5" cy="17.5" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.6 8.4L20 19M8.6 15.6L20 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      <span>Log</span>
+    </button>
+    <button class="tab" data-a="tab" data-v="dash" aria-label="Dashboard">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="12.5" width="4" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10" y="7.5" width="4" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="16.5" y="3.5" width="4" height="17" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="tab" data-a="tab" data-v="history" aria-label="History">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      <span>History</span>
+    </button>
+    <button class="tab" data-a="tab" data-v="more" aria-label="More">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3.5v2.6M12 17.9v2.6M3.5 12h2.6M17.9 12h2.6M5.9 5.9l1.9 1.9M16.2 16.2l1.9 1.9M18.1 5.9l-1.9 1.9M7.8 16.2l-1.9 1.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>More</span>
+    </button>
+  </nav>
+
+  <div id="toast-root" aria-live="polite"></div>
+  <div id="sheet-root"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
