@@ -210,12 +210,9 @@ function openSheet(html, opts = {}) {
       ${html}
     </div>`;
   document.body.classList.add('no-scroll');
-  requestAnimationFrame(() => root.classList.add('open'));
 }
 function closeSheet() {
-  const root = $('#sheet-root');
-  root.classList.remove('open');
-  root.innerHTML = '';
+  $('#sheet-root').innerHTML = '';
   document.body.classList.remove('no-scroll');
 }
 
