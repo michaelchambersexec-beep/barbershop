@@ -23,7 +23,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
-html { background: var(--bg); } /* shows under the iOS status bar and overscroll bounce */
+/* gray up top (iOS status bar / overscroll), white at the bottom so Safari's
+   translucent toolbar region blends into the white tab bar */
+html { background: linear-gradient(to bottom, var(--bg) 60%, #FFFFFF); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
@@ -210,6 +212,22 @@ button:disabled { cursor: default; }
 .eod-btn {
   display: flex; align-items: center; justify-content: space-between;
   font-size: 15px; font-weight: 700;
+}
+
+/* ----------------------------------------------------------------- goals */
+.goal-card { display: flex; align-items: center; gap: 14px; }
+.ring { width: 64px; height: 64px; flex: 0 0 auto; }
+.ring circle { fill: none; stroke-width: 8; }
+.ring-bg { stroke: #E7E7E2; }
+.ring-fg {
+  stroke: var(--lime); stroke-linecap: round;
+  transform: rotate(-90deg); transform-origin: center;
+}
+.goal-text { flex: 1; min-width: 0; }
+.goal-text .mid { margin-top: 2px; }
+.goal-unset {
+  border: 2px dashed var(--line); background: transparent; box-shadow: none;
+  text-align: center; color: var(--mut); font-weight: 700; padding: 18px;
 }
 
 /* -------------------------------------------------------------- history */
@@ -407,4 +425,9 @@ button:disabled { cursor: default; }
 .fatal { padding: 40px 24px; font-size: 15px; line-height: 1.5; text-align: center; }
 @media (min-width: 561px) {
   body { box-shadow: 0 0 0 1px var(--line); }
+}
+/* in-browser (not installed): square the tab bar so it sits flush against
+   Safari's own bottom bar instead of floating above it */
+@media (display-mode: browser) {
+  #tabbar { border-radius: 0; }
 }

@@ -93,6 +93,7 @@ const DEFAULT_CATEGORIES = ['Booth rent', 'Supplies', 'Equipment', 'Other'];
 let settings = {
   name: '', services: [], categories: [...DEFAULT_CATEGORIES],
   onboarded: false, lastBackup: 0, nudgeDismissed: 0, installDismissed: false,
+  goalDaily: 0, goalWeekly: 0,
 };
 let jobs = [];      // in-memory mirror, kept sorted by ts asc
 let expenses = [];  // in-memory mirror
@@ -178,6 +179,11 @@ function periodWindow(period) {
   if (period === 'today') {
     const from = startOfDay(n);
     return { from, to: from + DAY, prevFrom: from - DAY, prevTo: from, vs: 'vs yesterday' };
+  }
+  if (period === 'week') {
+    const dow = (n.getDay() + 6) % 7; // week starts Monday
+    const from = startOfDay(n) - dow * DAY;
+    return { from, to: startOfDay(n) + DAY, prevFrom: from - 7 * DAY, prevTo: from - 7 * DAY + (now() - from) + 1, vs: 'vs last week' };
   }
   const endToday = startOfDay(n) + DAY; // include all of today, even future-stamped entries
   if (period === 'month') {
@@ -360,6 +366,18 @@ function chartData(period) {
     }
     return { bars, caption: 'Last 14 days' };
   }
+  if (period === 'week') {
+    const dow = (new Date().getDay() + 6) % 7;
+    const thisMon = startOfDay(now()) - dow * DAY;
+    const bars = [];
+    for (let i = 7; i >= 0; i--) {
+      const from = thisMon - i * 7 * DAY;
+      const c = collect(from, from + 7 * DAY);
+      const d = new Date(from);
+      bars.push({ v: c.total, label: `${d.getMonth() + 1}/${d.getDate()}` });
+    }
+    return { bars, caption: 'Last 8 weeks' };
+  }
   if (period === 'month') {
     const bars = [];
     for (let i = 11; i >= 0; i--) {
@@ -405,6 +423,30 @@ function chartSVG(data) {
   return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Revenue chart">${bars}${labels}${callout}</svg>`;
 }
 
+function goalCardHTML(p, c) {
+  const isDay = p === 'today';
+  const goal = isDay ? settings.goalDaily || 0 : settings.goalWeekly || 0;
+  const kind = isDay ? 'daily' : 'weekly';
+  if (!goal) {
+    return `<button class="card goal-unset" data-a="goal-set" data-v="${kind}">🎯 Set a ${kind} goal</button>`;
+  }
+  const pct = Math.min(1, c.total / goal);
+  const C = 2 * Math.PI * 26;
+  const hit = c.total >= goal;
+  return `<div class="card goal-card">
+    <svg viewBox="0 0 64 64" class="ring" role="img" aria-label="Goal progress">
+      <circle cx="32" cy="32" r="26" class="ring-bg"/>
+      <circle cx="32" cy="32" r="26" class="ring-fg" stroke-dasharray="${(pct * C).toFixed(1)} ${C.toFixed(1)}"/>
+    </svg>
+    <div class="goal-text">
+      <p class="label">${isDay ? 'Daily' : 'Weekly'} goal · ${fmt$(goal)}
+        <button class="mini-add" data-a="goal-set" data-v="${kind}">edit</button></p>
+      <p class="mid num">${Math.round(pct * 100)}%</p>
+      <p class="sub">${hit ? '🎉 Goal hit — keep going!' : esc(fmt$(goal - c.total)) + ' to go'}</p>
+    </div>
+  </div>`;
+}
+
 function renderDash() {
   const p = ui.dashPeriod;
   const w = periodWindow(p);
@@ -415,16 +457,16 @@ function renderDash() {
   const pctCard = c.total ? 100 - pctCash : 0;
   const avgTicket = c.count ? Math.round(c.revenue / c.count) : 0;
   const avgTip = c.tipped ? Math.round(c.tips / c.tipped) : 0;
-  const periodName = { today: 'Today', month: 'This month', year: 'This year' }[p];
+  const periodName = { today: 'Today', week: 'This week', month: 'This month', year: 'This year' }[p];
   const showNudge = jobs.length >= 20 &&
     now() - (settings.lastBackup || 0) > 30 * DAY &&
     now() - (settings.nudgeDismissed || 0) > 7 * DAY;
 
   $('#screen-dash').innerHTML = `
     <div class="seg" role="tablist">
-      ${['today', 'month', 'year'].map((k) => `
+      ${['today', 'week', 'month', 'year'].map((k) => `
         <button class="seg-btn ${p === k ? 'on' : ''}" data-a="period" data-v="${k}" role="tab">
-          ${{ today: 'Today', month: 'Month', year: 'Year' }[k]}</button>`).join('')}
+          ${{ today: 'Today', week: 'Week', month: 'Month', year: 'Year' }[k]}</button>`).join('')}
     </div>
 
     ${showNudge ? `
@@ -439,6 +481,8 @@ function renderDash() {
       <p class="huge num">${fmt$(c.total)}</p>
       ${trendChip(c.total, prev.total, w.vs)}
     </div>
+
+    ${p === 'today' || p === 'week' ? goalCardHTML(p, c) : ''}
 
     <div class="grid2">
       <div class="card tint-peach">
@@ -556,6 +600,7 @@ function renderMore() {
     <div class="card list-card">
       <button class="mrow" data-a="services-open"><span>✂️ Services &amp; prices</span><span class="mrow-end">${settings.services.length} ›</span></button>
       <button class="mrow" data-a="categories-open"><span>🏷️ Expense categories</span><span class="mrow-end">${settings.categories.length} ›</span></button>
+      <button class="mrow" data-a="goals-open"><span>🎯 Goals</span><span class="mrow-end">${settings.goalDaily ? esc(fmt$(settings.goalDaily)) + '/day' : 'off'} ›</span></button>
     </div>
 
     <p class="section-label">Your data</p>
@@ -719,7 +764,80 @@ function openEOD() {
       <div class="eod-row"><span>Expenses today</span><span class="num">−${fmt$(c.expenses)}</span></div>
       <div class="eod-row eod-net"><span>Net for the day</span><span class="num">${fmt$(c.net)}</span></div>
     </div>
+    <button class="btn-ghost" data-a="eod-share">📤 Share day card</button>
     <button class="btn-primary" data-a="sheet-close">Done ✂️</button>`);
+}
+
+/* ----------------------------------------------------- shareable day card */
+function rr(x, px, py, w, h, r) {
+  x.beginPath();
+  if (x.roundRect) { x.roundRect(px, py, w, h, r); return; }
+  x.moveTo(px + r, py);
+  x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r);
+  x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r);
+  x.closePath();
+}
+
+async function shareDayCard() {
+  const from = startOfDay(now());
+  const c = collect(from, from + DAY);
+  let tipsCash = 0, tipsCard = 0;
+  for (const j of jobs) {
+    if (j.ts < from || j.ts >= from + DAY) continue;
+    if (j.tipMethod === 'cash') tipsCash += j.tip; else tipsCard += j.tip;
+  }
+  const W = 1080, H = 1350;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const x = cv.getContext('2d');
+  const F = (wgt, size) => `${wgt} ${size}px -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif`;
+
+  x.fillStyle = '#F1F1EF'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#8A8A86'; x.font = F(700, 34); x.textAlign = 'center';
+  x.fillText('✂️  BARBERSHOP  ✂️', W / 2, 110);
+  x.fillStyle = '#191919'; x.font = F(800, 52);
+  x.fillText(new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }), W / 2, 185);
+
+  // cash panel
+  x.fillStyle = '#FBEDDF'; rr(x, 60, 240, 960, 340, 48); x.fill();
+  x.fillStyle = '#8A8A86'; x.font = F(700, 34); x.fillText('💵 CASH TO COUNT', W / 2, 330);
+  x.fillStyle = '#191919'; x.font = F(800, 124); x.fillText(fmt$(c.cash), W / 2, 470);
+  x.fillStyle = '#8A8A86'; x.font = F(600, 30); x.fillText(`includes ${fmt$(tipsCash)} cash tips`, W / 2, 535);
+
+  // rows panel
+  x.fillStyle = '#FFFFFF'; rr(x, 60, 630, 960, 540, 48); x.fill();
+  const rows = [
+    ['💳 Card total', fmt$(c.card)],
+    ['Tips (cash / card)', `${fmt$(tipsCash)} / ${fmt$(tipsCard)}`],
+    ['✂️ Cuts', String(c.count)],
+    ['Expenses', '−' + fmt$(c.expenses)],
+    ['Net for the day', fmt$(c.net)],
+  ];
+  rows.forEach(([label, val], i) => {
+    const y = 630 + 70 + i * 100;
+    const last = i === rows.length - 1;
+    x.textAlign = 'left'; x.fillStyle = last ? '#191919' : '#8A8A86'; x.font = F(last ? 800 : 600, 38);
+    x.fillText(label, 120, y);
+    x.textAlign = 'right'; x.fillStyle = '#191919'; x.font = F(800, last ? 48 : 42);
+    x.fillText(val, 960, y);
+    if (!last) { x.fillStyle = '#E7E7E2'; x.fillRect(120, y + 32, 840, 2); }
+  });
+
+  x.textAlign = 'center'; x.fillStyle = '#8A8A86'; x.font = F(600, 28);
+  x.fillText('made with Barbershop', W / 2, 1280);
+
+  const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+  const file = new File([blob], `barbershop-${dayKey(now())}.png`, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; }
+    catch (e) { if (e.name === 'AbortError') return; /* else fall through to download */ }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast('<span class="toast-text">Day card saved 📤</span>');
 }
 
 /* ------------------------------------------------ services & categories */
@@ -1004,6 +1122,22 @@ document.addEventListener('click', async (e) => {
     /* dashboard */
     case 'period': ui.dashPeriod = v; renderDash(); break;
     case 'eod-open': openEOD(); break;
+    case 'eod-share': await shareDayCard(); break;
+    case 'goal-set':
+      openNumpad(v === 'daily' ? 'Daily goal ($0 = off)' : 'Weekly goal ($0 = off)', async (cents) => {
+        if (v === 'daily') settings.goalDaily = cents; else settings.goalWeekly = cents;
+        await saveSettings();
+        closeSheet(); renderActive();
+        showToast(`<span class="toast-text">${v === 'daily' ? 'Daily' : 'Weekly'} goal ${cents ? 'set · ' + esc(fmt$(cents)) : 'turned off'} 🎯</span>`);
+      }); break;
+    case 'goals-open':
+      openSheet(`
+        <h2 class="sheet-title">Goals</h2>
+        <p class="sheet-sub">A target keeps the day honest. Progress shows on the dashboard. Set to $0 to turn one off.</p>
+        <div class="card list-card">
+          <button class="mrow" data-a="goal-set" data-v="daily"><span>Daily goal</span><span class="mrow-end">${settings.goalDaily ? esc(fmt$(settings.goalDaily)) : 'off'} ›</span></button>
+          <button class="mrow" data-a="goal-set" data-v="weekly"><span>Weekly goal</span><span class="mrow-end">${settings.goalWeekly ? esc(fmt$(settings.goalWeekly)) : 'off'} ›</span></button>
+        </div>`); break;
     case 'nudge-dismiss':
       e.stopPropagation();
       settings.nudgeDismissed = now(); await saveSettings(); renderDash(); break;
